@@ -1,0 +1,16 @@
+/kzgblobs
+/kzgblobs.exe
+/dist/
+*.test
+*.out
+bench.txt
+
+/testdata/spec-tests/*
+!/testdata/spec-tests/verify_kzg_proof/
+
+/**/testdata/fuzz/*/cache/
+
+.idea/
+.vscode/
+*.swp
+.DS_Store
