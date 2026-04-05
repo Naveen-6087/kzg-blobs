@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  STATICCHECK_VERSION: v0.8.1 # 2026.2.1
+  GOVULNCHECK_VERSION: v1.8.0
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+      - name: go vet
+        run: go vet ./...
+      - name: staticcheck
+        run: go run "honnef.co/go/tools/cmd/staticcheck@${STATICCHECK_VERSION}" ./...
+      - name: govulncheck
+        run: go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Cache reference tests
+        id: spec-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: testdata/spec-tests
+          key: kzg-spec-tests-${{ hashFiles('scripts/fetch-spec-tests.sh') }}
+      - name: Fetch reference tests
+        if: steps.spec-cache.outputs.cache-hit != 'true'
+        run: bash scripts/fetch-spec-tests.sh
+      - name: Build
+        run: go build ./...
+      - name: Test (race detector, all reference tests required)
+        env:
+          KZG_REQUIRE_SPEC_TESTS: "1"
+        run: go test -race -count=1 ./...
+
+  fuzz:
+    name: Fuzz (short)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Fuzz each target for 30s
+        run: |
+          set -e
+          for target in kzg:FuzzBytesToG1 kzg:FuzzVerifyKZGProof pointeval:FuzzRun                         blobpack:FuzzRoundTrip blobpack:FuzzUnpack; do
+            pkg="${target%%:*}"
+            fn="${target##*:}"
+            echo "::group::$pkg/$fn"
+            go test "./$pkg" -run '^$' -fuzz "^${fn}\$" -fuzztime 30s
+            echo "::endgroup::"
+          done
