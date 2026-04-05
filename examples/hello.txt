@@ -1,0 +1,1 @@
+Hello from an EIP-4844 blob!
