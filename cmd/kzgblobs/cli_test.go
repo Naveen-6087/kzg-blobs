@@ -189,3 +189,19 @@ func TestGoldenExample(t *testing.T) {
 		}
 	}
 }
+
+func TestVersion(t *testing.T) {
+	for _, args := range [][]string{{"version"}, {"-version"}} {
+		code, out, errOut := runCLI(t, args...)
+		if code != exitOK {
+			t.Fatalf("%v exit %d: %s", args, code, errOut)
+		}
+		var res map[string]string
+		if err := json.Unmarshal([]byte(out), &res); err != nil {
+			t.Fatalf("%v parse json: %v", args, err)
+		}
+		if res["version"] != version {
+			t.Fatalf("%v: got %q, want %q", args, res["version"], version)
+		}
+	}
+}

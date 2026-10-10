@@ -22,6 +22,7 @@ const (
 	exitInvalid     = 1
 	exitUsage       = 2
 	defaultMaxBlobs = 6
+	version         = "v0.1.0"
 )
 
 var errInvalid = errors.New("proof is invalid")
@@ -66,11 +67,12 @@ func commands() []command {
 		{"verify", "verify a blob proof", cmdVerify},
 		{"verify-point", "verify an opening proof (commitment, z, y, proof)", cmdVerifyPoint},
 		{"point-eval", "run the 0x0a point evaluation precompile on call data", cmdPointEval},
+		{"version", "print version information", cmdVersion},
 	}
 }
 
 func usage(w io.Writer) {
-	fmt.Fprintln(w, "usage: kzgblobs [-setup FILE] <command> [flags] [args]")
+	fmt.Fprintln(w, "usage: kzgblobs [-setup FILE] [-version] <command> [flags] [args]")
 	fmt.Fprintln(w, "\ncommands:")
 	for _, c := range commands() {
 		fmt.Fprintf(w, "  %-13s %s\n", c.name, c.summary)
@@ -78,16 +80,28 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "\nrun 'kzgblobs <command> -h' for command flags")
 }
 
+func cmdVersion(e *env, args []string) error {
+	return e.emit(map[string]string{"version": version})
+}
+
 func run(args []string, stdout, stderr io.Writer) int {
 	global := flag.NewFlagSet("kzgblobs", flag.ContinueOnError)
 	global.SetOutput(stderr)
 	setup := global.String("setup", "", "trusted setup file in c-kzg-4844 text format (default: embedded mainnet setup)")
+	showVer := global.Bool("version", false, "print version information")
 	global.Usage = func() { usage(stderr) }
 	if err := global.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return exitOK
 		}
 		return exitUsage
+	}
+	if *showVer {
+		e := &env{stdout: stdout, stderr: stderr}
+		if err := cmdVersion(e, nil); err != nil {
+			return exitUsage
+		}
+		return exitOK
 	}
 	rest := global.Args()
 	if len(rest) == 0 {
