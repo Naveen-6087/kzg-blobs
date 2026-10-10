@@ -139,6 +139,13 @@ func TestVersionedHashKnown(t *testing.T) {
 	if got := hex.EncodeToString(h[:]); got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
+	if !MatchesVersionedHash(inf, h) {
+		t.Fatal("MatchesVersionedHash returned false for matching hash")
+	}
+	var diff [32]byte
+	if MatchesVersionedHash(inf, diff) {
+		t.Fatal("MatchesVersionedHash returned true for zero hash")
+	}
 }
 
 func FuzzRun(f *testing.F) {

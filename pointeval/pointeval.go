@@ -29,6 +29,11 @@ func VersionedHash(c kzg.Commitment) [32]byte {
 	return h
 }
 
+// MatchesVersionedHash reports whether hash matches the EIP-4844 versioned hash of c.
+func MatchesVersionedHash(c kzg.Commitment, hash [32]byte) bool {
+	return VersionedHash(c) == hash
+}
+
 // Input is versioned_hash (32) || z (32) || y (32) || commitment (48) || proof (48).
 type Input struct {
 	VersionedHash [32]byte
